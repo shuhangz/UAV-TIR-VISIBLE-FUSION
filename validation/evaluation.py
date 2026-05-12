@@ -1,16 +1,22 @@
+"""质量导出与序列化辅助函数。
+
+该模块负责把热富集后的点云导出为可审计的 PLY 文件，字段顺序与
+docs/file_formats.md 中的产物契约保持一致，方便后续人工检查和自动化
+回归对比。
 """
-evaluation.py (Export snippet extension)
-Step 9: Quality Export and Serialization.
-"""
-import os
+
 import logging
+
 import numpy as np
 
+logger = logging.getLogger(__name__)
+
 def export_thermal_point_cloud_ply(point_cloud, output_path: str):
-    """
-    Exports the enriched point cloud to a standard PLY format.
-    Fields comply with file_formats.md contract:
-    x, y, z, r, g, b, temperature, support_view_count, fusion_weight
+    """导出热富集点云为 ASCII PLY。
+
+    点云对象需要至少提供以下数组属性：points、colors、temperature、
+    support_views、fusion_weights。导出的顶点字段顺序固定为：
+    x, y, z, r, g, b, temperature, support_view_count, fusion_weight。
     """
     points = point_cloud.points
     colors = point_cloud.colors
@@ -22,6 +28,7 @@ def export_thermal_point_cloud_ply(point_cloud, output_path: str):
     
     try:
         with open(output_path, "w") as f:
+            # PLY 头部必须先声明顶点数量和每个字段的类型。
             f.write("ply\n")
             f.write("format ascii 1.0\n")
             f.write(f"element vertex {num_points}\n")
@@ -33,17 +40,18 @@ def export_thermal_point_cloud_ply(point_cloud, output_path: str):
             f.write("end_header\n")
             
             for i in range(num_points):
+                # 每行输出一个点：几何、颜色、温度以及融合质量信息。
                 x, y, z = points[i]
                 r, g, b = colors[i]
                 temp = temps[i]
                 view_c = views[i]
                 weight = weights[i]
                 
-                # Explicit NaN marker for missing temperature data
+                # 缺失温度显式写成 NaN，便于下游区分“无值”和“零值”。
                 temp_str = f"{temp:.4f}" if not np.isnan(temp) else "NaN"
                 
                 f.write(f"{x:.4f} {y:.4f} {z:.4f} {r} {g} {b} {temp_str} {view_c} {weight:.4f}\n")
                 
-        logging.info(f"Successfully exported thermally enriched point cloud to {output_path}")
+        logger.info(f"Successfully exported thermally enriched point cloud to {output_path}")
     except Exception as e:
-        logging.error(f"Failed to export PLY: {e}")
+        logger.exception(f"Failed to export PLY: {e}")

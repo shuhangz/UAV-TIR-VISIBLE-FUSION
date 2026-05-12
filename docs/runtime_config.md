@@ -9,6 +9,7 @@
 - 适用于单次批处理任务的启动参数与会话参数
 - 适用于数据入口、标定、匹配、辐射、重建与富集各阶段的公共配置
 - 适用于写入运行清单的可审计配置快照
+- 适用于记录日志级别、日志目录与文件滚动策略等运行期可观测性配置
 
 ## 3. 配置优先级
 
@@ -39,6 +40,8 @@
 | `quality_thresholds` | object | 是 | 阶段阈值集合 |
 | `environment_parameters` | object | 是 | 热辐射层所需环境参数 |
 | `toolchain_versions` | object | 是 | Python / Metashape / TWMM 等工具链版本 |
+| `log_level` | string | 否 | 控制台日志级别，默认 `INFO` |
+| `log_dir` | string | 否 | 运行日志目录，默认派生为 `runs/<run_id>/logs/` |
 
 ### 4.2 工具链版本对象
 
@@ -58,11 +61,13 @@
 - `quality_thresholds` 中的所有数值阈值都必须标明单位或无量纲属性。
 - `environment_parameters` 必须使用明确单位，不能只写一个无单位数字。
 - 如果任何必要字段缺失，配置层必须拒绝进入后续阶段，而不是默默使用隐式默认值。
+- `log_level` 与 `log_dir` 属于可观测性参数，可以由入口层派生默认值，但一旦显式指定就应写入运行清单或审计记录。
 
 ## 6. 与其他文档的关系
 
 - [docs/architecture.md](architecture.md) 定义配置层在流水线中的位置。
 - [docs/file_formats.md](file_formats.md) 定义运行清单、持久化配置快照和各阶段产物的结构。
+- [docs/logging_and_audit.md](logging_and_audit.md) 定义日志文件位置、日志级别和审计轨迹。
 - [docs/dataset_profile.md](dataset_profile.md) 定义不能被配置覆盖的物理事实。
 - [docs/radiometry_model.md](radiometry_model.md) 定义环境参数如何进入温度矩阵生成。
 

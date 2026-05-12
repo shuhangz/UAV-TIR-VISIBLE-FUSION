@@ -191,6 +191,7 @@ class ConfigManager:
         # 常用子目录
         self.dirs = {
             'manifest': os.path.join(self.run_dir, 'manifest'),
+            'logs': os.path.join(self.run_dir, 'logs'),
             'calibration': os.path.join(self.run_dir, 'calibration'),
             'undistorted': os.path.join(self.run_dir, 'undistorted'),
             'preprocess': os.path.join(self.run_dir, 'preprocess'),

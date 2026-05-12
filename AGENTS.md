@@ -23,6 +23,7 @@
 - [docs/dataset_profile.md](docs/dataset_profile.md) 是不可变物理事实的单一来源，只记录数据集边界、物理尺寸、标定板几何、相机与元数据基线。
 - [docs/runtime_config.md](docs/runtime_config.md) 是运行配置与参数校验的单一来源，只记录一次运行的输入路径、环境参数、阈值、工具链版本和派生规则。
 - [docs/architecture.md](docs/architecture.md) 定义端到端层级、模块边界和跨层约束。
+- [docs/logging_and_audit.md](docs/logging_and_audit.md) 定义运行日志、阶段审计和落盘规则。
 - [docs/file_formats.md](docs/file_formats.md) 定义所有持久化产物的字段契约与命名规则。
 - [docs/calibration_model.md](docs/calibration_model.md) 定义双光谱标定与去畸变。
 - [docs/matching_algorithm.md](docs/matching_algorithm.md) 定义 TWMM 适配、对应点、外点剔除与单应性估计。
@@ -32,6 +33,7 @@
 ## 设计文档体系
 - [提炼技术路线参考文献.md](提炼技术路线参考文献.md) 与 [提炼图像匹配参考文献.md](提炼图像匹配参考文献.md) 是提炼原始文献后得到的对代码项目的具体指导文件，用于快速了解方法与学术挑战，同时服从于系统工程契约。
 - [docs/architecture.md](docs/architecture.md) 定义全流程数据流、模块边界、运行模式与跨层约束。
+- [docs/logging_and_audit.md](docs/logging_and_audit.md) 定义运行日志与审计轨迹的统一规则。
 - [docs/dataset_profile.md](docs/dataset_profile.md) 定义不可变数据集事实、影像分辨率与标定板物理尺寸。
 - [docs/runtime_config.md](docs/runtime_config.md) 定义运行配置、参数优先级与校验规则。
 - [docs/file_formats.md](docs/file_formats.md) 定义标定、去畸变、匹配、辐射、重建、富集与导出各阶段的数据契约。
@@ -50,6 +52,7 @@
 - 基于 `ConfigManager` 对各核心层级方法进行全链路端到端时序组装调度。
 - 负责区分两类数据：标定数据和业务处理数据。
 - 负责统一管理文件命名、路径规范、日志目录、导出目录。
+- 负责统一管理文件命名、路径规范、日志目录、导出目录；运行日志必须落到 `runs/<run_id>/logs/run.log`。
 - 负责读取 [docs/dataset_profile.md](docs/dataset_profile.md) 与 [docs/runtime_config.md](docs/runtime_config.md)，生成可审计的运行上下文、运行清单和阶段阈值快照。
 
 ### 2. 光学系统标定层
@@ -92,7 +95,9 @@
 
 ### 9. 导出与质检层
 - 负责导出带温度属性的点云、匹配结果、重投影记录和质量报告。
+- 负责导出带温度属性的点云、匹配结果、重投影记录和质量报告，并与运行日志共同构成可回放的审计链。
 - 负责输出能被人工快速检查的中间产物，如对应点叠加图、误差直方图、温度分布图和覆盖率统计。
+- 运行日志属于质检材料的一部分，但它不是业务结果本身。
 
 ## 数据契约
 
@@ -166,6 +171,7 @@
 - 如果标定模型、热辐射模型、Metashape 流程或热富集策略发生变化，必须先更新对应设计文档，再更新实现。
 - 不要把 [技术路线参考文献.md](技术路线参考文献.md) 或 [可见光与热红外影像匹配参考文献.md](可见光与热红外影像匹配参考文献.md) 当作需要同步修改的实现文件；它们只是为交流方便而命名的参考文献 markdown 文件。
 - 如果数据格式或元数据字段变化，必须先更新数据契约，再更新实现。
+- 如果日志目录、日志级别、日志滚动策略或审计字段变化，必须先更新 [docs/logging_and_audit.md](docs/logging_and_audit.md) 与受影响的 [docs/file_formats.md](docs/file_formats.md)，再更新实现。
 - 如果新依赖影响到某一层边界，必须记录它属于哪一层，以及为什么需要它。
 - 如果某个模块变得过于耦合，应先拆分职责，再继续扩展功能。
 - 除非有明确的缺陷或接口不兼容，不要重写 TWMM 的核心算法实现。

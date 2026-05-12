@@ -71,6 +71,7 @@
 - `dataset_id` 必须与 [docs/dataset_profile.md](dataset_profile.md) 中记录的数据集边界一致。
 - `configsha8` 应来自运行配置的规范化摘要，确保相同配置可被追溯到相同运行。
 - 所有阶段产物都应写入 `runs/<run_id>/` 之下，不得散落在工作区根目录。
+- 运行日志应写入 `runs/<run_id>/logs/`，作为本次运行的审计轨迹。
 - 若 `run_id` 已存在，则新运行必须显式选择覆盖、另起一个 `run_id`，或终止。
 
 ## 6. 标定结果
@@ -284,7 +285,8 @@
 
 建议使用按阶段分层的目录结构，例如：
 
-- `runs/<run_id>/manifest/`：运行清单、运行配置和总日志
+- `runs/<run_id>/manifest/`：运行清单、运行配置和阶段状态快照
+- `runs/<run_id>/logs/`：控制台回放级别的文件日志与滚动日志
 - `runs/<run_id>/calibration/`：标定结果
 - `runs/<run_id>/preprocess/`：去畸变图像和预处理产物
 - `runs/<run_id>/matching/`：对应点、单应性和可视化
@@ -292,6 +294,12 @@
 - `runs/<run_id>/metashape/`：Metashape 项目和点云（兼容旧名 `reconstruction/`）
 - `runs/<run_id>/enrichment/`：热富集结果
 - `runs/<run_id>/reports/`：质检材料
+
+### 13.1 日志产物
+
+- `runs/<run_id>/logs/run.log`：本次运行的主日志文件，包含阶段开始、完成、失败、耗时和摘要信息。
+- `runs/<run_id>/logs/run.log.*`：滚动日志备份，保留最近的运行轨迹。
+- 日志文件是审计材料，不是派生业务结果；它不参与后续数值计算，只用于回放和排障。
 
 ## 14. 非目标
 

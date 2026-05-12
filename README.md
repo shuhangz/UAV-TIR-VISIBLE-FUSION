@@ -20,18 +20,27 @@
 ### 前置要求
 
 1. **Python 3.9+** 与 pip
-2. **Agisoft Metashape Professional 2.2.1**（如果要执行阶段 6-8，即重建与富集）
+2. **Agisoft Metashape Professional 2.2.1**（绿色免安装专业版，必须通过其内部集成的 Python 环境执行代码）
 3. **ExifTool 13.48+**（用于提取相机元数据）
-4. **项目依赖包**
+4. **项目依赖包安装与执行（极其重要）**
 
-```bash
-# 安装 Python 依赖
-pip install -r requirements.txt
+> ⚠️ **注意**：由于 Metashape 的授权及环境独占性，代码必须在 Metashape 内部集成的 Python 环境中运行，不能使用系统外部的 Python 虚拟环境。
+
+#### 安装依赖到 Metashape 内部
+打开 PowerShell，执行以下命令（请根据你的实际路径调整 `D:\OneDrive\Desktop\techical_route_new`）：
+```powershell
+& "D:\OneDrive\Desktop\techical_route_new\metashape_engine\App\Metashape\python\python.exe" -m pip install -r "D:\OneDrive\Desktop\techical_route_new\requirements.txt"
 ```
 
-#### 关键说明
+#### 在 Metashape 内部执行主脚本
+安装完依赖后，必须通过 `metashape.exe -r` 参数来执行主入口脚本：
+```powershell
+& "D:\OneDrive\Desktop\techical_route_new\metashape_engine\App\Metashape\metashape.exe" -r "D:\OneDrive\Desktop\techical_route_new\main.py"
+```
 
-- **Metashape**：不通过 pip 安装，需独立下载桌面应用。该代码假设 Metashape Professional 已在系统中安装并授权。
+#### 其他关键说明
+
+- **Metashape**：本项目使用的是绿色版的 Metashape Pro（现已更名为 `metashape_engine` 文件夹以防止被误认为导入模块）。
 - **ExifTool**：需要独立安装（Windows: 下载 exe；macOS/Linux: brew install exiftool）
 
 ### 数据准备
@@ -75,15 +84,17 @@ exiftool -json test_Arctic/rgb_dir/*.JPG test_Arctic/tiff_dir/*.TIFF > metadata_
 
 ### 执行全链路
 
-```bash
-# 默认使用 workspace_root 的数据进行完整处理
-python main.py
+> **注意**：不可以使用 `python main.py`，必须通过 Metashape 引擎来调用！
 
-# 或显式指定 run_all（效果相同）
-python main.py run_all
+```powershell
+# 默认使用 workspace_root 的数据进行完整处理
+& "D:\OneDrive\Desktop\techical_route_new\metashape_engine\App\Metashape\metashape.exe" -r "D:\OneDrive\Desktop\techical_route_new\main.py"
+
+# （可选）通过参数指定（注：在作为脚本传递给 Metashape 时，若需附加脚本参数，可在脚本后空一格再加上，如）：
+& "D:\OneDrive\Desktop\techical_route_new\metashape_engine\App\Metashape\metashape.exe" -r "D:\OneDrive\Desktop\techical_route_new\main.py" run_all
 
 # 指定自定义配置文件（JSON 格式）
-python main.py --config-file path/to/custom_config.json
+& "D:\OneDrive\Desktop\techical_route_new\metashape_engine\App\Metashape\metashape.exe" -r "D:\OneDrive\Desktop\techical_route_new\main.py" --config-file path/to/custom_config.json
 ```
 
 ---
@@ -240,115 +251,3 @@ runs/
 ## 许可证与引用
 
 本项目集成了多个开源库与学术方法。核心匹配算法基于 TWMM（可见光-热红外匹配论文）。请参考 [TWMM-main/README.md](TWMM-main/README.md) 了解相关论文与引用信息。
-- --search-radius
-- --level-max
-- --crop-width
-- --crop-height
-- --crop-offset-x
-- --crop-offset-y
-- --thermal-scale
-- --visible-scale
-- --outlier-threshold-px
-- --min-inliers
-- --homography-condition-max
-- --max-pairs
-
-### 2.3 radiometry
-
-radiometry 的命令行参数也有强制必填项：
-
-- --workspace-root
-- --metadata-json
-- --thermal-tiff-dir
-- --output-dir
-
-可选参数包括：
-
-- --ambient-temperature-celsius
-- --relative-humidity-percent
-- --emissivity-ratio
-- --distance-to-target-m
-- --reflected-temperature-celsius
-- --atmospheric-pressure-hpa
-- --environment-source
-- --environment-source-ref
-- --processing-version
-- --input-is-temperature
-- --raw-to-temperature-scale
-- --raw-to-temperature-offset
-- --max-frames
-
-注意：虽然代码对部分环境参数提供了默认值，但从 radiometry_model.md 的设计要求看，这些参数在正式运行时应尽量显式提供，否则温度结果会降级，质量标记也可能变差。
-
-## 3. 运行前应该做的操作
-
-### 3.1 准备 Python 环境
-
-先激活项目的虚拟环境，确认依赖可用。当前代码依赖至少包括：
-
-- opencv-python
-- numpy
-- scipy
-- pandas
-- torch
-- tifffile
-- Pillow
-- PyYAML
-
-如果要跑 Metashape 相关流程，还要确认 Agisoft Metashape Professional 2.2.1 的 Python API 已配置好。
-
-### 3.2 检查目录结构
-
-先确认以下路径存在且内容正确：
-
-- test_Arctic/rgb_dir：可见光图像
-- test_Arctic/tiff_dir：热红外 TIFF 主输入帧
-- test_Arctic/thermal_dir：热红外 JPG 预览图，只用于检查，不作为生产输入
-- M400-H30T-CALIB-CHESSBOARD/RGB：RGB 标定图
-- M400-H30T-CALIB-CHESSBOARD/NIR：热红外标定图
-- TWMM-main：TWMM 代码目录
-- metadata_all.json：热辐射元数据文件
-
-### 3.3 确认输入类型
-
-热红外生产链路必须使用 TIFF 主输入帧，不要把 thermal_dir 里的 JPG 预览图当作正式输入。JPG 只适合人工预览、对照和排查。
-
-### 3.4 准备环境参数
-
-如果要做准确的辐射校正，建议提前准备以下字段：
-
-- 环境温度
-- 相对湿度
-- 材料发射率
-- 传感器到目标距离
-
-有条件的话再补充：
-
-- 反射温度
-- 大气压
-
-### 3.5 确认输出目录可写
-
-所有阶段都会把结果写入 runs 目录下的运行子目录。运行前要确认工作区有写权限，且现有 run_id 不会冲突。
-
-## 4. 推荐运行顺序
-
-如果你想逐步排查，建议按下面顺序执行：
-
-1. 先跑 matching 或 radiometry，确认输入路径和依赖没问题
-2. 再跑 run_all，验证全链路编排
-3. 最后检查 runs 目录里的标定、去畸变、匹配、辐射、重建、重投影和富集产物
-
-## 5. 常见现象
-
-- 直接运行 python main.py：会提示缺少 command
-- matching 少任何必填参数：会在 argparse 阶段直接退出
-- radiometry 少任何必填参数：会在 argparse 阶段直接退出
-- run_all 能启动但后续报文件不存在：通常是数据目录、标定目录或元数据文件没准备好
-
-## 6. 建议的下一步
-
-如果你想降低再次出错的概率，建议先做两件事：
-
-- 先手动检查 test_Arctic、M400-H30T-CALIB-CHESSBOARD、TWMM-main 和 metadata_all.json 是否都在
-- 再用 matching 或 radiometry 的完整命令跑一次小范围验证，然后再切到 run_all

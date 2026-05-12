@@ -19,7 +19,9 @@
 from __future__ import annotations
 
 import argparse
+import logging
 import xml.etree.ElementTree as ET
+import time
 from pathlib import Path
 from typing import Any, Dict, Iterable, List, Optional, Sequence, Tuple
 
@@ -31,6 +33,7 @@ from config.config_manager import ConfigManager
 from enrichment.thermal_enrichment import ThermalEnricher
 from geometry.reprojection_export import ReprojectionExporter
 from matching import TwmmAdapter
+from pipeline_io.logging_setup import configure_run_logging
 from pipeline_io.json_io import read_json, write_json
 from preprocess.undistort import ImageUndistorter
 from radiometry import RadiometryPipeline
@@ -38,6 +41,7 @@ from validation.evaluation import export_thermal_point_cloud_ply
 
 
 IMAGE_SUFFIXES = {".jpg", ".jpeg", ".png", ".tif", ".tiff"}
+logger = logging.getLogger(__name__)
 
 
 def _ensure_path(path_value: Any) -> Path:
@@ -52,6 +56,11 @@ def _collect_images(directory: Path, suffixes: Optional[Sequence[str]] = None) -
 
 
 def _load_stage_manifest(manager: ConfigManager) -> Dict[str, Any]:
+    """读取当前运行的清单文件。
+
+    清单用于记录阶段状态和补充信息，优先从已有 run_manifest.json 续写，
+    这样中断后重跑时仍能保留历史阶段状态。
+    """
     manifest_path = Path(manager.dirs["manifest"]) / "run_manifest.json"
     if manifest_path.exists():
         return read_json(manifest_path)
@@ -59,6 +68,11 @@ def _load_stage_manifest(manager: ConfigManager) -> Dict[str, Any]:
 
 
 def _update_stage_manifest(manager: ConfigManager, stage_name: str, status: str, **details: Any) -> None:
+    """原子性地更新单个阶段的状态。
+
+    每次状态变化都先读回清单再写回，保证中途失败时仍能留下可审计的
+    运行轨迹：running -> completed / failed。
+    """
     manifest_path = Path(manager.dirs["manifest"]) / "run_manifest.json"
     manifest = _load_stage_manifest(manager)
     manifest.setdefault("stage_status", {})[stage_name] = status
@@ -81,6 +95,11 @@ def _load_calibration_bundle(calibration_output_path: Path) -> Dict[str, Any]:
 
 
 def _load_initial_calibration_xml(xml_path: Path, sensor_name: str) -> Dict[str, Any]:
+    """从初始 XML 标定文件构造一个可被下游消费的标定字典。
+
+    这是标定失败时的兜底路径，用于保证后续去畸变阶段仍然可以获得
+    一组可用的初值，而不是直接中断整个流水线。
+    """
     if not xml_path.exists():
         raise FileNotFoundError(f"Initial calibration XML not found: {xml_path}")
 
@@ -136,6 +155,11 @@ def _load_initial_calibration_xml(xml_path: Path, sensor_name: str) -> Dict[str,
 
 
 def _prepare_twmm_params(manager: ConfigManager) -> TwmmParams:
+    """把运行配置转换成 TWMM 适配器所需的参数对象。
+
+    这里显式合并了运行时阈值和用户配置，确保匹配阶段读取到的是已经
+    过校验的最终参数，而不是半成品配置。
+    """
     quality_thresholds = manager.runtime_config.quality_thresholds or {}
     twmm_cfg = manager.user_config.get("twmm", {}) if hasattr(manager, "user_config") else {}
     return TwmmParams(
@@ -155,6 +179,7 @@ def _prepare_twmm_params(manager: ConfigManager) -> TwmmParams:
 
 
 def _prepare_environment(manager: ConfigManager) -> EnvironmentParameters:
+    """把用户配置中的环境参数包装成辐射校正层对象。"""
     env_cfg = manager.user_config.get("environment_parameters", {}) if hasattr(manager, "user_config") else {}
     if not isinstance(env_cfg, dict):
         env_cfg = {}
@@ -171,6 +196,7 @@ def _prepare_environment(manager: ConfigManager) -> EnvironmentParameters:
 
 
 def _prepare_radiometry_params(manager: ConfigManager) -> RadiometryParams:
+    """准备热辐射处理参数，包括元数据索引和温度值域约束。"""
     rad_cfg = manager.user_config.get("radiometry", {}) if hasattr(manager, "user_config") else {}
     metadata_json = manager.user_config.get("metadata_json", str(Path(manager.workspace_root) / "metadata_all.json"))
     return RadiometryParams(
@@ -185,6 +211,11 @@ def _prepare_radiometry_params(manager: ConfigManager) -> RadiometryParams:
 
 
 def _build_undistorted_path(base_dir: Path, source_path: Path, is_tir: bool) -> Path:
+    """根据源文件名构造去畸变产物的输出路径。
+
+    热红外主处理对象最终统一落为 TIFF，可见光则统一落为 PNG，
+    这样后续匹配与辐射层能直接按扩展名判断输入模态。
+    """
     output_name = source_path.stem + (".tiff" if is_tir else ".png")
     return base_dir / output_name
 
@@ -206,13 +237,24 @@ def _load_matching_homographies(results: Iterable[Any]) -> Dict[str, np.ndarray]
 
 
 def _run_stage_with_status(manager: ConfigManager, stage_name: str, func) -> Any:
+    """统一的阶段执行包装器。
+
+    所有阶段都通过这个入口更新状态，避免每个阶段各自写状态逻辑。
+    一旦内部抛出异常，状态会写成 failed 并附带错误文本。
+    """
+    stage_logger = logger.getChild(stage_name)
+    stage_logger.info("Stage started")
     _update_stage_manifest(manager, stage_name, "running")
+    start_time = time.perf_counter()
     try:
         result = func()
     except Exception as exc:
         _update_stage_manifest(manager, stage_name, "failed", error=str(exc))
+        stage_logger.exception("Stage failed")
         raise
+    elapsed_ms = (time.perf_counter() - start_time) * 1000.0
     _update_stage_manifest(manager, stage_name, "completed")
+    stage_logger.info("Stage completed in %.1f ms", elapsed_ms)
     return result
 
 
@@ -226,17 +268,45 @@ def _build_parser() -> argparse.ArgumentParser:
         help="仅支持 run_all；可省略，默认执行 run_all",
     )
     parser.add_argument("--config-file", type=str, required=False, help="Path to JSON config file or workspace root")
+    parser.add_argument(
+        "--log-level",
+        type=str,
+        default="INFO",
+        choices=["DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"],
+        help="控制台日志级别；文件日志始终记录 DEBUG",
+    )
     return parser
 
 
+def _summarize_result(result: Any) -> str:
+    """把阶段返回值压缩成适合写日志的简短摘要。"""
+    if result is None:
+        return "none"
+    if isinstance(result, list):
+        return f"list(len={len(result)})"
+    if isinstance(result, dict):
+        return f"dict(keys={list(result.keys())[:8]})"
+    if hasattr(result, "points"):
+        points = getattr(result, "points", None)
+        size = getattr(points, "shape", [None])[0] if points is not None else None
+        return f"point_cloud(points={size})"
+    return type(result).__name__
+
+
 def run_all(args: argparse.Namespace) -> None:
-    # 全链路串联，依赖 config_manager 处理统一配置
+    # 全链路串联，依赖 ConfigManager 统一生成运行目录、阶段选择和阈值。
     print(f"Starting E2E pipeline with config source: {args.config_file}")
     manager = ConfigManager(user_config=args.config_file)
+    log_file = configure_run_logging(manager.run_dir, console_level=getattr(logging, args.log_level.upper(), logging.INFO))
+    logger.info("Run logging file: %s", log_file)
+    logger.info("Run id: %s", manager.run_id)
+    logger.info("Workspace root: %s", manager.workspace_root)
+    logger.info("Output root: %s", manager.run_dir)
 
     stages = set(manager.runtime_config.stage_selection)
-    print(f"Stages to execute: {sorted(stages)}")
-    print(f"Output Root: {manager.run_dir}")
+    logger.info("Stages to execute: %s", sorted(stages))
+    logger.info("Dataset id: %s", manager.runtime_config.dataset_id)
+    logger.info("Stage manifest: %s", Path(manager.dirs["manifest"]) / "run_manifest.json")
 
     workspace_root = Path(manager.workspace_root)
     dataset_root = Path(manager.runtime_config.input_dataset_root)
@@ -268,10 +338,13 @@ def run_all(args: argparse.Namespace) -> None:
     reconstruction_image_sizes: Dict[str, Tuple[int, int]] = {}
 
     if "config" in stages:
+        # config 阶段不做重计算，只把运行上下文写入清单。
         _update_stage_manifest(manager, "config", "completed", workspace_root=str(workspace_root))
+        logger.info("Configuration snapshot recorded")
 
     if "calibration" in stages:
         def _run_calibration() -> Dict[str, Any]:
+            # 标定阶段先尝试棋盘格求解，失败时才退回初始 XML。
             calibrator = DualSpectralCalibrator(config=manager)
             rgb_images = _find_sensor_images(calibration_rgb_dir, "RGB")
             tir_images = _find_sensor_images(calibration_tir_dir, "NIR")
@@ -284,6 +357,7 @@ def run_all(args: argparse.Namespace) -> None:
             tir_result = calibrator.calibrate([str(path) for path in tir_images], sensor_name="NIR", is_tir=True)
 
             if not tir_result.get("focal_length_px") or len(tir_result.get("focal_length_px", [])) < 2:
+                # 当 TIR 棋盘格没有足够角点时，用 XML 里的初值兜底，保证后续链路可跑。
                 fallback_tir = _load_initial_calibration_xml(Path(manager.workspace_root) / "H30T_NIR.xml", "NIR")
                 fallback_tir["source_images"] = [path.name for path in tir_images]
                 tir_result = fallback_tir
@@ -293,6 +367,7 @@ def run_all(args: argparse.Namespace) -> None:
             return {"RGB": rgb_result, "NIR": tir_result}
 
         calibration_result = _run_stage_with_status(manager, "calibration", _run_calibration)
+        logger.info("Calibration summary: %s", _summarize_result(calibration_result))
 
     if "preprocess" in stages:
         def _run_preprocess() -> Dict[str, List[str]]:
@@ -318,6 +393,7 @@ def run_all(args: argparse.Namespace) -> None:
 
             rgb_outputs: List[str] = []
             tir_outputs: List[str] = []
+            # RGB / TIR 分开处理，保持模态输出格式稳定。
             for source_path in rgb_sources:
                 output_path = _build_undistorted_path(undistorted_rgb_dir, source_path, False)
                 rgb_undistorter.process_image(str(source_path), str(output_path), is_tir=False)
@@ -333,10 +409,12 @@ def run_all(args: argparse.Namespace) -> None:
         preprocess_result = _run_stage_with_status(manager, "preprocess", _run_preprocess)
         undistorted_rgb_paths = [Path(path) for path in preprocess_result["rgb"]]
         undistorted_tir_paths = [Path(path) for path in preprocess_result["thermal"]]
+        logger.info("Preprocess outputs: rgb=%d thermal=%d", len(undistorted_rgb_paths), len(undistorted_tir_paths))
 
     if "matching" in stages:
         def _run_matching_stage():
             twmm_params = _prepare_twmm_params(manager)
+            # 这里显式指向 TWMM-main，避免误把本地 Metashape 目录当作算法实现入口。
             adapter = TwmmAdapter(workspace_root=Path(manager.workspace_root), twmm_root=workspace_root / "TWMM-main")
             return adapter.match_batch_from_dirs(
                 rgb_dir=undistorted_rgb_dir,
@@ -348,11 +426,13 @@ def run_all(args: argparse.Namespace) -> None:
             )
 
         matching_results = _run_stage_with_status(manager, "matching", _run_matching_stage)
+        logger.info("Matching results: %s", _summarize_result(matching_results))
 
     if "radiometry" in stages:
         def _run_radiometry_stage():
             radiometry_params = _prepare_radiometry_params(manager)
             env = _prepare_environment(manager)
+            # 热辐射层只消费热红外 TIFF 和环境参数，不依赖 RGB 或点云。
             pipeline = RadiometryPipeline(workspace_root=Path(manager.workspace_root), params=radiometry_params)
             return pipeline.process_batch(
                 thermal_tiff_dir=thermal_tiff_dir,
@@ -362,11 +442,13 @@ def run_all(args: argparse.Namespace) -> None:
             )
 
         radiometry_results = _run_stage_with_status(manager, "radiometry", _run_radiometry_stage)
+        logger.info("Radiometry outputs: %s", _summarize_result(radiometry_results))
 
     if "metashape" in stages:
         def _run_metashape_stage():
             try:
-                from Metashape.photogrammetry import PhotogrammetryEngine
+                # 这里导入的是外部 Metashape 运行时；如果本地包遮蔽或安装缺失会直接失败。
+                from metashape_engine.photogrammetry import PhotogrammetryEngine
             except Exception as exc:
                 raise RuntimeError(f"Metashape runtime is not available: {exc}") from exc
 
@@ -395,6 +477,7 @@ def run_all(args: argparse.Namespace) -> None:
             return engine.reconstruct_point_cloud(image_arrays, [path.stem for path in images[: len(image_arrays)]])
 
         point_cloud = _run_stage_with_status(manager, "metashape", _run_metashape_stage)
+        logger.info("Metashape point cloud: %s", _summarize_result(point_cloud))
 
     if "geometry" in stages:
         def _run_geometry_stage():
@@ -403,6 +486,7 @@ def run_all(args: argparse.Namespace) -> None:
 
             camera_params: Dict[str, Dict[str, Any]] = {}
             for camera_id, pose in point_cloud.camera_poses.items():
+                # 从重建点云上携带的相机位姿和内参恢复投影所需参数。
                 intrinsics = point_cloud.intrinsics.get(camera_id, np.eye(3, dtype=np.float32))
                 width, height = reconstruction_image_sizes.get(
                     camera_id,
@@ -419,6 +503,7 @@ def run_all(args: argparse.Namespace) -> None:
             return exporter.export_reprojections()
 
         reprojection_data = _run_stage_with_status(manager, "geometry", _run_geometry_stage)
+        logger.info("Geometry reprojection records: %d points", len(reprojection_data))
 
     if "enrichment" in stages:
         def _run_enrichment_stage():
@@ -434,10 +519,12 @@ def run_all(args: argparse.Namespace) -> None:
             if not thermal_maps:
                 raise RuntimeError("No thermal maps available for enrichment")
 
+            # 富集层同时需要温度矩阵和单应性矩阵，因此这里一次性装配。
             enricher = ThermalEnricher(homography=homography_maps, thermal_data=thermal_maps, config={"thermal_extraction": {"thermal_resolution": "1280x1024"}})
             return enricher.enrich_point_cloud(point_cloud, reprojection_data)
 
         enriched_point_cloud = _run_stage_with_status(manager, "enrichment", _run_enrichment_stage)
+        logger.info("Enrichment completed: %s", _summarize_result(enriched_point_cloud))
 
     if "validation" in stages:
         def _run_validation_stage():
@@ -448,8 +535,9 @@ def run_all(args: argparse.Namespace) -> None:
             return {"ply_path": str(output_path)}
 
         _run_stage_with_status(manager, "validation", _run_validation_stage)
+        logger.info("Validation export completed")
 
-    print("Pipeline execution completed.")
+    logger.info("Pipeline execution completed")
 
 
 def main() -> None:

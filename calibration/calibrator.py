@@ -10,7 +10,6 @@ from config.config_manager import ConfigManager
 from pipeline_io.io_utils import safe_imread
 
 logger = logging.getLogger(__name__)
-logging.basicConfig(level=logging.INFO)
 
 
 class DualSpectralCalibrator:

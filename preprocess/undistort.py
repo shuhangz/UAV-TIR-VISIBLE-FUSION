@@ -2,8 +2,11 @@ import cv2
 import numpy as np
 import os
 import json
+import logging
 from typing import Dict, Any
 from pipeline_io.io_utils import safe_imread
+logger = logging.getLogger(__name__)
+
 
 try:
     import tifffile
@@ -21,36 +24,44 @@ except ImportError:
 
 
 def _to_json_serializable(value):
-    """Attempt to convert various TIFF tag value types to JSON-serializable Python types."""
+    """把 TIFF 标签值转成可直接写入 JSON 的基础类型。
+
+    TIFF 元数据里常见 bytes、NumPy 标量、数组、嵌套列表等类型，不能直接
+    被 json.dump 序列化，所以这里统一做递归降级，保证侧车元数据能落盘。
+    """
     try:
-        # Primitives
+        # 标量值可以直接写入 JSON。
         if isinstance(value, (str, int, float, bool)) or value is None:
             return value
-        # Bytes
+        # 字节串转成 UTF-8 文本，无法解码时保留可读 repr。
         if isinstance(value, (bytes, bytearray)):
             try:
                 return value.decode('utf-8', errors='replace')
             except Exception:
                 return repr(value)
-        # NumPy scalars
+        # NumPy 标量先降成 Python 原生类型。
         if isinstance(value, np.generic):
             return value.item()
-        # NumPy arrays
+        # 数组递归转为列表，以保留结构。
         if isinstance(value, np.ndarray):
             return _to_json_serializable(value.tolist())
-        # Lists / tuples
+        # 列表和元组按元素继续递归。
         if isinstance(value, (list, tuple)):
             return [_to_json_serializable(v) for v in value]
-        # Dictionaries
+        # 字典保持键值结构，但确保键和值都可序列化。
         if isinstance(value, dict):
             return {str(k): _to_json_serializable(v) for k, v in value.items()}
-        # Fallback: try to convert to str
+        # 兜底：转成字符串，避免单个异常影响整个 TIFF sidecar 导出。
         return str(value)
     except Exception:
         return str(value)
 
 class ImageUndistorter:
-    """图像去畸变层，利用标定基线提供稳定的几何图像用于匹配与重建"""
+    """图像去畸变层。
+
+    负责把标定结果转换为 OpenCV 可用的相机矩阵与畸变系数，并将输入
+    图像输出为统一的几何校正结果。该层只做几何处理，不做辐射或语义处理。
+    """
     
     def __init__(self, calibration_data: Dict[str, Any]):
         self.calibration_data = calibration_data
@@ -78,24 +89,27 @@ class ImageUndistorter:
 
     def process_image(self, input_path: str, output_path: str, is_tir: bool = False):
         """
-        执行去畸变，并按照契约保存相应格式
-        RGB 保留为无损 PNG，TIR 热红外主处理对象强制为 TIFF
+        执行去畸变，并按产物契约保存结果。
+
+        RGB 统一输出 PNG，避免有损压缩；热红外主处理对象统一输出 TIFF，
+        以保留原始热图数据和相关元数据。
         """
-        # 读取输入图像（支持 Unicode 路径的安全读取）
+        # 支持 Unicode 路径、特殊 TIFF 和退化环境的安全读取。
         img = safe_imread(input_path, cv2.IMREAD_UNCHANGED)
         if img is None:
             raise FileNotFoundError(f"Cannot read image: {input_path}")
 
+        # 使用标定参数做几何去畸变，并投影到新的相机矩阵上。
         dst = cv2.undistort(img, self.camera_matrix, self.dist_coeffs, None, self.new_camera_matrix)
 
-        # 根据 ROI 进行裁切
+        # 只在 ROI 有效时裁切，保留有效成像区域。
         x, y, w, h = self.roi
         if w > 0 and h > 0:
             dst_cropped = dst[y:y+h, x:x+w]
         else:
             dst_cropped = dst
 
-        # 保存去畸变结果
+        # 输出目录按需创建，避免上游每次单独处理。
         os.makedirs(os.path.dirname(output_path) or '.', exist_ok=True)
 
         if is_tir:
@@ -187,3 +201,12 @@ class ImageUndistorter:
 
         with open(meta_path, 'w', encoding='utf-8') as f:
             json.dump(metadata, f, indent=4, ensure_ascii=False)
+        logger.info(
+            "Undistorted %s image: source=%s output=%s cropped=%s size=%sx%s",
+            "thermal" if is_tir else "rgb",
+            input_path,
+            output_path,
+            metadata["cropped"],
+            dst_cropped.shape[1],
+            dst_cropped.shape[0],
+        )
