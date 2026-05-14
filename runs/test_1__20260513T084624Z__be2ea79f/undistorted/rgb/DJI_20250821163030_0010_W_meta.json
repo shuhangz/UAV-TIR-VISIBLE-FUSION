@@ -1,0 +1,13 @@
+{
+    "schema_version": "1.0",
+    "source_image": "DJI_20250821163030_0010_W.JPG",
+    "undistortion_model": "brown_conrady_5_params",
+    "cropped": true,
+    "resampled": false,
+    "scale_factor": 1.0,
+    "calibration_ref": "RGB",
+    "output_size": [
+        4031,
+        3023
+    ]
+}
