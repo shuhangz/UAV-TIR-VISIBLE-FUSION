@@ -18,6 +18,19 @@
 
 from __future__ import annotations
 
+# ---------------------------------------------------------------------------
+# 路径引导：确保 src/ 在 Python 搜索路径中。
+# 因为项目通过 Metashape 的 Python 环境直接执行（而非 pip install），
+# 必须手动将 src/ 加入 sys.path，使所有子包可被正常导入。
+# ---------------------------------------------------------------------------
+import sys as _sys
+from pathlib import Path as _Path
+
+_src_dir = _Path(__file__).resolve().parent / "src"
+if str(_src_dir) not in _sys.path:
+    _sys.path.insert(0, str(_src_dir))
+# ---------------------------------------------------------------------------
+
 import argparse
 import logging
 import xml.etree.ElementTree as ET
@@ -448,7 +461,7 @@ def run_all(args: argparse.Namespace) -> None:
         def _run_metashape_stage():
             try:
                 # 这里导入的是外部 Metashape 运行时；如果本地包遮蔽或安装缺失会直接失败。
-                from metashape_engine.photogrammetry import PhotogrammetryEngine
+                from metashape_reconstruction.photogrammetry import PhotogrammetryEngine
             except Exception as exc:
                 raise RuntimeError(f"Metashape runtime is not available: {exc}") from exc
 

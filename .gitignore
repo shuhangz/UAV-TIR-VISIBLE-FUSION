@@ -1,0 +1,49 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.egg-info/
+dist/
+build/
+*.egg
+
+# Virtual environments
+venv/
+.venv/
+env/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Claude Code local settings
+.claude/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Project outputs (large files, not for version control)
+runs/
+*.ply
+*.las
+*.laz
+
+# Metashape engine (large binary, not for version control)
+metashape_engine/
+
+# Data files (should be managed separately)
+test_Arctic/
+M400-H30T-CALIB-CHESSBOARD/
+metadata_all.json
+
+# Claude memory sessions
+.remember/
+
+# PyCharm in vendored code
+TWMM-main/.idea/
+
+# Logs
+*.log

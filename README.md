@@ -29,18 +29,18 @@
 #### 安装依赖到 Metashape 内部
 打开 PowerShell，执行以下命令（请根据你的实际路径调整 `D:\OneDrive\Desktop\techical_route_new`）：
 ```powershell
-& "D:\OneDrive\Desktop\techical_route_new\metashape_engine\App\Metashape\python\python.exe" -m pip install -r "D:\OneDrive\Desktop\techical_route_new\requirements.txt"
+& "path/to/metashape/App/Metashape/python/python.exe" -m pip install -r "path/to/requirements.txt"
 ```
 
 #### 在 Metashape 内部执行主脚本
 安装完依赖后，必须通过 `metashape.exe -r` 参数来执行主入口脚本：
 ```powershell
-& "D:\OneDrive\Desktop\techical_route_new\metashape_engine\App\Metashape\metashape.exe" -r "D:\OneDrive\Desktop\techical_route_new\main.py"
+& "path/to/metashape/App/Metashape/metashape.exe" -r "path/to/main.py"
 ```
 
 #### 其他关键说明
 
-- **Metashape**：本项目使用的是绿色版的 Metashape Pro（现已更名为 `metashape_engine` 文件夹以防止被误认为导入模块）。
+- **Metashape**：本项目使用的是绿色免安装版的 Metashape Professional 2.2.1，解压后通过其内部 Python 环境执行代码。
 - **ExifTool**：需要独立安装（Windows: 下载 exe；macOS/Linux: brew install exiftool）
 
 ### 数据准备
@@ -57,11 +57,23 @@ workspace_root/
 ├── M400-H30T-CALIB-CHESSBOARD/  # 标定数据集
 │   ├── RGB/                 # 棋盘格标定板的可见光图像
 │   └── NIR/                 # 棋盘格标定板的热红外图像
+├── src/                     # 所有 Python 代码包
+│   ├── config/              # 配置管理
+│   ├── calibration/         # 双光谱标定
+│   ├── preprocess/          # 影像去畸变与预处理
+│   ├── matching/            # 跨光谱匹配
+│   ├── radiometry/          # 热辐射校正
+│   ├── metashape_reconstruction/  # 摄影测量重建
+│   ├── geometry/            # 重投影与几何计算
+│   ├── enrichment/          # 点云热富集
+│   ├── pipeline_io/         # 输入输出管理
+│   └── validation/          # 质检与验证
+├── docs/references/         # 中文参考文献
 ├── H30T_RGB.xml             # RGB 初始标定参数
 ├── H30T_NIR.xml             # 热红外初始标定参数
 ├── TWMM-main/               # 跨光谱匹配库
-├── Metashape/               # Metashape Python API 环境
 ├── metadata_all.json        # 相机元数据（需手动或 exiftool 生成）
+├── requirements.txt         # Python 依赖
 └── main.py                  # 主入口脚本
 ```
 
@@ -88,34 +100,34 @@ exiftool -json test_Arctic/rgb_dir/*.JPG test_Arctic/tiff_dir/*.TIFF > metadata_
 
 ```powershell
 # 默认使用 workspace_root 的数据进行完整处理
-& "D:\OneDrive\Desktop\techical_route_new\metashape_engine\App\Metashape\metashape.exe" -r "D:\OneDrive\Desktop\techical_route_new\main.py"
+& "path/to/metashape/App/Metashape/metashape.exe" -r "path/to/main.py"
 
 # （可选）通过参数指定（注：在作为脚本传递给 Metashape 时，若需附加脚本参数，可在脚本后空一格再加上，如）：
-& "D:\OneDrive\Desktop\techical_route_new\metashape_engine\App\Metashape\metashape.exe" -r "D:\OneDrive\Desktop\techical_route_new\main.py" run_all
+& "path/to/metashape/App/Metashape/metashape.exe" -r "path/to/main.py" run_all
 
 # 指定自定义配置文件（JSON 格式）
-& "D:\OneDrive\Desktop\techical_route_new\metashape_engine\App\Metashape\metashape.exe" -r "D:\OneDrive\Desktop\techical_route_new\main.py" --config-file path/to/custom_config.json
+& "path/to/metashape/App/Metashape/metashape.exe" -r "path/to/main.py" --config-file path/to/custom_config.json
 ```
 
 ---
 
 ## 模块与工作流
 
-### 0. 配置层（config/）
+### 0. 配置层（src/config/）
 
 - **职责**：加载运行参数、管理工作区路径、生成可审计的运行清单
 - **关键文件**：
   - `config_manager.py`：配置管理器，处理参数校验与路径规范化
   - `runtime_models.py`：数据模型定义（DatasetProfile, EnvironmentParameters 等）
 
-### 1. 标定层（calibration/）
+### 1. 标定层（src/calibration/）
 
 - **职责**：用棋盘格目标完成双光谱系统标定
 - **输入**：`M400-H30T-CALIB-CHESSBOARD/RGB` 和 `M400-H30T-CALIB-CHESSBOARD/NIR`
 - **输出**：相机矩阵、畸变系数、重投影误差、质量标记
 - **方法**：OpenCV 棋盘格检测 + 相机标定（Zhang 2000）
 
-### 2. 预处理层（preprocess/）
+### 2. 预处理层（src/preprocess/）
 
 - **职责**：影像去畸变与前处理
 - **输入**：原始 RGB/热红外影像 + 标定结果
@@ -124,41 +136,41 @@ exiftool -json test_Arctic/rgb_dir/*.JPG test_Arctic/tiff_dir/*.TIFF > metadata_
   - RGB：CLAHE 对比度归一化
   - 热红外：灰度反转 + Otsu 自动二值化 + 局部对比度增强
 
-### 3. 匹配层（matching/）
+### 3. 匹配层（src/matching/）
 
 - **职责**：跨光谱特征匹配与单应性估计（基于 TWMM）
 - **输入**：去畸变后的 RGB 与热红外图像对
 - **输出**：对应点、异常值剔除结果、单应性矩阵
 - **核心文件**：`twmm_adapter.py`（TWMM 的包装接口）
 
-### 4. 热辐射层（radiometry/）
+### 4. 热辐射层（src/radiometry/）
 
 - **职责**：从热红外 TIFF 提取温度矩阵
 - **输入**：热红外 TIFF 主帧 + metadata_all.json + 环境参数
 - **输出**：温度矩阵（°C 或 K）+ 元数据记录
 - **依赖**：DJI SDK、ExifTool 字段、环境温度、相对湿度
 
-### 5. 重建层（Metashape/photogrammetry.py）
+### 5. 重建层（src/metashape_reconstruction/photogrammetry.py）
 
 - **职责**：多视角立体重建生成稠密点云
 - **输入**：RGB 影像组 + 内参
 - **输出**：三维点云、相机姿态、深度图
 - **流程**：特征匹配 → 相机对齐 → 深度图构建 → 稠密云生成
 
-### 6. 重投影层（geometry/reprojection_export.py）
+### 6. 重投影层（src/geometry/reprojection_export.py）
 
 - **职责**：建立 3D 点与 2D 图像的对应关系
 - **输入**：点云 + Metashape 项目 + RGB 标定
 - **输出**：重投影坐标、误差、可见性标记
 
-### 7. 热富集层（enrichment/thermal_enrichment.py）
+### 7. 热富集层（src/enrichment/thermal_enrichment.py）
 
 - **职责**：为点云赋予温度属性
 - **输入**：重投影记录 + 温度矩阵 + 单应性矩阵
 - **输出**：带温度的点云 (XYZ, RGB, Temperature)
 - **策略**：双线性插值 + 可见性过滤 + 多视图融合
 
-### 8. 导出层（validation/ 和 pipeline_io/）
+### 8. 导出层（src/validation/ 和 src/pipeline_io/）
 
 - **职责**：点云导出与质检报告生成
 - **输出**：PLY/LAS 格式点云、匹配对叠加图、温度分布直方图、质量评分
@@ -245,6 +257,11 @@ runs/
 - [docs/matching_algorithm.md](docs/matching_algorithm.md) - 匹配与单应性算法
 - [docs/radiometry_model.md](docs/radiometry_model.md) - 热辐射校正模型
 - [docs/reconstruction_and_enrichment.md](docs/reconstruction_and_enrichment.md) - 重建与点云富集
+- [docs/references/技术路线参考文献.md](docs/references/技术路线参考文献.md) - 端到端流程顶层设计参考
+- [docs/references/可见光与热红外影像匹配参考文献.md](docs/references/可见光与热红外影像匹配参考文献.md) - 跨光谱匹配算法参考
+- [docs/references/提炼技术路线参考文献.md](docs/references/提炼技术路线参考文献.md) - 技术路线提炼指导
+- [docs/references/提炼图像匹配参考文献.md](docs/references/提炼图像匹配参考文献.md) - 图像匹配提炼指导
+- [docs/references/metashape_python_api_2_2_1_MinerU__20251017023519.md](docs/references/metashape_python_api_2_2_1_MinerU__20251017023519.md) - Metashape Python API 参考
 
 ---
 

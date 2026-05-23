@@ -35,43 +35,43 @@
 
 ## 4. 模块边界
 
-### 4.1 config
+### 4.1 config (`src/config/`)
 
 负责管理数据集路径、相机参数、环境参数、输出目录、运行模式和全局开关。config 不应承载算法逻辑，只负责读取 [docs/dataset_profile.md](dataset_profile.md) 的物理事实、读取 [docs/runtime_config.md](runtime_config.md) 的运行参数，并构造经过校验的运行配置对象、运行清单和阶段阈值快照。
 
-### 4.2 calibration
+### 4.2 calibration (`src/calibration/`)
 
 负责棋盘格检测、相机标定、畸变建模、标定结果持久化和标定质量评估。该层只处理双光谱相机几何，不处理热辐射或点云富集。
 
-### 4.3 preprocess
+### 4.3 preprocess (`src/preprocess/`)
 
 负责 RGB 归一化、CLAHE、热红外 TIFF 反转、Otsu、局部增强、去畸变和必要的图像尺度归一。该层的职责是为标定、匹配和重建提供稳定输入。
 
-### 4.4 matching
+### 4.4 matching (`src/matching/`)
 
 负责 TWMM 适配、输入输出转换、对应点管理、异常值剔除和单应性估计。生产实现必须优先使用 TWMM-main/TAMM_clean，不重新实现论文核心逻辑。
 
-### 4.5 radiometry
+### 4.5 radiometry (`src/radiometry/`)
 
 负责热红外 TIFF 主输入帧、DJI SDK 元数据、ExifTool 信息和环境参数的整合，输出标准化的温度矩阵。该层必须区分原始传感器值、辐射校正中间值和最终温度值。
 
-### 4.6 metashape
+### 4.6 metashape_reconstruction (`src/metashape_reconstruction/`)
 
 负责 Metashape 项目自动化，包括导入、对齐、优化、深度图构建、稠密点云生成和导出。该层必须与通用算法层隔离，避免把摄影测量自动化逻辑散落到其他模块。
 
-### 4.7 geometry
+### 4.7 geometry (`src/geometry/`)
 
 负责重投影、遮挡判断、坐标变换、插值和可见性判定。该层只输出几何证据，不直接承担温度赋值。
 
-### 4.8 enrichment
+### 4.8 enrichment (`src/enrichment/`)
 
 负责将热信息分配到三维点，执行可见性过滤、重投影误差过滤、权重融合和缺失值处理。该层消费 geometry、matching 和 radiometry 的输出。
 
-### 4.9 io
+### 4.9 pipeline_io (`src/pipeline_io/`)
 
 负责图像、XML、JSON、CSV、PLY / LAS、日志和清单文件的读写。io 层必须稳定、可审计，并尽量避免隐式格式转换。日志输出应通过统一的入口配置，避免各业务模块重复初始化根日志器。
 
-### 4.10 validation
+### 4.10 validation (`src/validation/`)
 
 负责单元测试、集成测试、质量评估、可视化检查材料和回归样例管理。validation 不生产业务结果，只验证其他层的结果是否满足门槛。它也消费运行日志作为失败回放与审计依据。
 

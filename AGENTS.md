@@ -2,18 +2,18 @@
 
 ## 项目目标
 - 目标是用 DJI H30T 的可见光与热红外影像，生成带温度信息的三维点云。
-- 总体流程以 [技术路线参考文献.md](技术路线参考文献.md) 为主线，但其中“可见光与热红外影像匹配”阶段必须替换为 [可见光与热红外影像匹配参考文献.md](可见光与热红外影像匹配参考文献.md) 与 [TWMM-main/](TWMM-main/) 中的 TWMM 方法。
+- 总体流程以 [docs/references/技术路线参考文献.md](docs/references/技术路线参考文献.md) 为主线，但其中”可见光与热红外影像匹配”阶段必须替换为 [docs/references/可见光与热红外影像匹配参考文献.md](docs/references/可见光与热红外影像匹配参考文献.md) 与 [TWMM-main/](TWMM-main/) 中的 TWMM 方法。
 - 实现语言以 Python 为主，集成计算机视觉库与 Agisoft Metashape Professional 2.2.1 的 Python API。
 - 产物必须可批处理、可复现、可审计，并便于后续在新 Session 中继续开发。
 - 项目的物理事实、影像尺寸与标定板几何统一记录在 [docs/dataset_profile.md](docs/dataset_profile.md)，运行参数与路径规则统一记录在 [docs/runtime_config.md](docs/runtime_config.md)。
 
 ## 资料优先级
-- [技术路线参考文献.md](技术路线参考文献.md) 是端到端流程的顶层设计依据（绝对基准）。
-- [可见光与热红外影像匹配参考文献.md](可见光与热红外影像匹配参考文献.md) 是跨光谱匹配阶段的算法依据（绝对基准）。
-- [提炼技术路线参考文献.md](提炼技术路线参考文献.md) 与 [提炼图像匹配参考文献.md](提炼图像匹配参考文献.md) 是提炼这两篇文献内容的对代码项目的指导文件，用于快速了解文献的技术方法。如果出现冲突或者不相符的部分，仍然以两篇原始文献为基准。
+- [docs/references/技术路线参考文献.md](docs/references/技术路线参考文献.md) 是端到端流程的顶层设计依据（绝对基准）。
+- [docs/references/可见光与热红外影像匹配参考文献.md](docs/references/可见光与热红外影像匹配参考文献.md) 是跨光谱匹配阶段的算法依据（绝对基准）。
+- [docs/references/提炼技术路线参考文献.md](docs/references/提炼技术路线参考文献.md) 与 [docs/references/提炼图像匹配参考文献.md](docs/references/提炼图像匹配参考文献.md) 是提炼这两篇文献内容的对代码项目的指导文件，用于快速了解文献的技术方法。如果出现冲突或者不相符的部分，仍然以两篇原始文献为基准。
 - [TWMM-main/README.md](TWMM-main/README.md) 说明了 TWMM 的官方代码入口与运行方式。
 - [TWMM-main/common/说明.txt](TWMM-main/common/说明.txt) 明确指出这三个公共文件是各算法都需要的共同文件，因此在集成时应视为共享依赖。
-- [metashape_python_api_2_2_1_MinerU__20251017023519.md](metashape_python_api_2_2_1_MinerU__20251017023519.md) 是 Metashape API 的权威参考。
+- [docs/references/metashape_python_api_2_2_1_MinerU__20251017023519.md](docs/references/metashape_python_api_2_2_1_MinerU__20251017023519.md) 是 Metashape API 的权威参考。
 - [H30T_RGB.xml](H30T_RGB.xml) 与 [H30T_NIR.xml](H30T_NIR.xml) 是 H30T 的初始相机标定参数来源。
 - [M400-H30T-CALIB-CHESSBOARD/](M400-H30T-CALIB-CHESSBOARD/) 是标定板影像数据。
 - [test_Arctic/](test_Arctic/) 是目标处理数据集，热红外分辨率为 1280×1024，可见光分辨率为 4032×3024；其中 `test_Arctic/tiff_dir/` 的 TIFF 热红外帧是生产主处理对象，`test_Arctic/thermal_dir/` 的 JPG 热红外帧仅作为预览、对照和人工检查材料。
@@ -31,7 +31,7 @@
 - [docs/reconstruction_and_enrichment.md](docs/reconstruction_and_enrichment.md) 定义 Metashape 重建、重投影、可见性与点云热富集。
 
 ## 设计文档体系
-- [提炼技术路线参考文献.md](提炼技术路线参考文献.md) 与 [提炼图像匹配参考文献.md](提炼图像匹配参考文献.md) 是提炼原始文献后得到的对代码项目的具体指导文件，用于快速了解方法与学术挑战，同时服从于系统工程契约。
+- [docs/references/提炼技术路线参考文献.md](docs/references/提炼技术路线参考文献.md) 与 [docs/references/提炼图像匹配参考文献.md](docs/references/提炼图像匹配参考文献.md) 是提炼原始文献后得到的对代码项目的具体指导文件，用于快速了解方法与学术挑战，同时服从于系统工程契约。
 - [docs/architecture.md](docs/architecture.md) 定义全流程数据流、模块边界、运行模式与跨层约束。
 - [docs/logging_and_audit.md](docs/logging_and_audit.md) 定义运行日志与审计轨迹的统一规则。
 - [docs/dataset_profile.md](docs/dataset_profile.md) 定义不可变数据集事实、影像分辨率与标定板物理尺寸。
@@ -44,10 +44,10 @@
 
 ## 系统架构
 
-### 1. 配置、数据入口层与主引擎 (`main.py` 与 `config/`)
-- 本项目的“入口层”在物理结构上被解耦为执行驱动 (`main.py`) 与数据定义 (`config/`)：
+### 1. 配置、数据入口层与主引擎 (`main.py` 与 `src/config/`)
+- 本项目的”入口层”在物理结构上被解耦为执行驱动 (`main.py`) 与数据定义 (`src/config/`)：
   - `main.py` 是全局主程序入口（等效于 C 语言的主函数），负责接受用户命令行调用、解析系统层级参数，并基于 `ConfigManager` 对各核心层级模块进行全链路端到端时序组装调度与流转驱动。它居于项目根目录以提供外部操作接口。
-  - `config/` 模块（包含 `runtime_models.py` 与 `config_manager.py`）只负责结构化的状态定义、环境数据校验与存取配置。它本身不包含业务流程运行逻辑，仅供全链路在任意阶段导入读取。
+  - `src/config/` 模块（包含 `runtime_models.py` 与 `config_manager.py`）只负责结构化的状态定义、环境数据校验与存取配置。它本身不包含业务流程运行逻辑，仅供全链路在任意阶段导入读取。
 - 负责读取数据集路径、相机配置、环境参数、输出目录与运行模式。
 - 基于 `ConfigManager` 对各核心层级方法进行全链路端到端时序组装调度。
 - 负责区分两类数据：标定数据和业务处理数据。
@@ -126,16 +126,16 @@
 - 输出：XYZ、RGB、温度、支持视角数、融合权重、质量评分。
 
 ## 目录与模块边界
-- `config`：数据集配置、相机配置、环境参数、运行参数。
-- `calibration`：棋盘格检测、相机标定、畸变建模、标定结果持久化。
-- `preprocess`：RGB 归一化、CLAHE、热红外反转、Otsu、局部增强、去畸变。
-- `matching`：TWMM 适配层、输入输出转换、对应点管理、单应性估计。
-- `radiometry`：DJI SDK、ExifTool、温度矩阵解析、辐射校正。
-- `metashape`：项目自动化、SfM / MVS 流程、相机与点云导出。
-- `geometry`：重投影、遮挡判断、坐标变换、插值与融合。
-- `enrichment`：热信息分配、视角加权、质量评分、缺失值处理。
-- `io`：图像、XML、JSON、CSV、PLY / LAS、日志与清单文件。
-- `validation`：单元测试、集成测试、指标评估、人工可视化检查材料。
+- `src/config`：数据集配置、相机配置、环境参数、运行参数。
+- `src/calibration`：棋盘格检测、相机标定、畸变建模、标定结果持久化。
+- `src/preprocess`：RGB 归一化、CLAHE、热红外反转、Otsu、局部增强、去畸变。
+- `src/matching`：TWMM 适配层、输入输出转换、对应点管理、单应性估计。
+- `src/radiometry`：DJI SDK、ExifTool、温度矩阵解析、辐射校正。
+- `src/metashape_reconstruction`：项目自动化、SfM / MVS 流程、相机与点云导出。
+- `src/geometry`：重投影、遮挡判断、坐标变换、插值与融合。
+- `src/enrichment`：热信息分配、视角加权、质量评分、缺失值处理。
+- `src/pipeline_io`：图像、XML、JSON、CSV、PLY / LAS、日志与清单文件。
+- `src/validation`：单元测试、集成测试、指标评估、人工可视化检查材料。
 
 ## 关键设计原则
 - 先做几何一致性，再做热信息融合。
@@ -169,7 +169,7 @@
 ## 修改纪律
 - 如果匹配算法发生变化，必须同步更新本文件，并同步更新 [docs/matching_algorithm.md](docs/matching_algorithm.md) 与受影响的数据契约。
 - 如果标定模型、热辐射模型、Metashape 流程或热富集策略发生变化，必须先更新对应设计文档，再更新实现。
-- 不要把 [技术路线参考文献.md](技术路线参考文献.md) 或 [可见光与热红外影像匹配参考文献.md](可见光与热红外影像匹配参考文献.md) 当作需要同步修改的实现文件；它们只是为交流方便而命名的参考文献 markdown 文件。
+- 不要把 [docs/references/技术路线参考文献.md](docs/references/技术路线参考文献.md) 或 [docs/references/可见光与热红外影像匹配参考文献.md](docs/references/可见光与热红外影像匹配参考文献.md) 当作需要同步修改的实现文件；它们只是为交流方便而命名的参考文献 markdown 文件。
 - 如果数据格式或元数据字段变化，必须先更新数据契约，再更新实现。
 - 如果日志目录、日志级别、日志滚动策略或审计字段变化，必须先更新 [docs/logging_and_audit.md](docs/logging_and_audit.md) 与受影响的 [docs/file_formats.md](docs/file_formats.md)，再更新实现。
 - 如果新依赖影响到某一层边界，必须记录它属于哪一层，以及为什么需要它。
