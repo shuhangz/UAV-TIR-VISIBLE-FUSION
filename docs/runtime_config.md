@@ -40,6 +40,7 @@
 | `quality_thresholds` | object | 是 | 阶段阈值集合 |
 | `environment_parameters` | object | 是 | 热辐射层所需环境参数 |
 | `toolchain_versions` | object | 是 | Python / Metashape / TWMM 等工具链版本 |
+| `metashape_paths` | object | 否 | Metashape 可执行文件路径，见下表 |
 | `log_level` | string | 否 | 控制台日志级别，默认 `INFO` |
 | `log_dir` | string | 否 | 运行日志目录，默认派生为 `runs/<run_id>/logs/` |
 
@@ -52,6 +53,36 @@
 - `twmm_source_ref`
 - `exiftool_version`
 - `pipeline_schema_version`
+
+### 4.3 Metashape 路径对象
+
+`metashape_paths` 用于指定 Metashape 可执行文件的位置，避免在文档和脚本中硬编码绝对路径。
+
+| 字段 | 类型 | 必填 | 说明 |
+|---|---|---|---|
+| `metashape_exe` | string | 否 | `metashape.exe` 的完整路径 |
+| `python_exe` | string | 否 | Metashape 内置 Python 的完整路径 |
+
+**解析优先级**（从高到低）：
+1. JSON 配置文件中的 `metashape_paths.metashape_exe` / `metashape_paths.python_exe`
+2. 环境变量 `METASHAPE_EXE` / `METASHAPE_PYTHON`
+3. 自动发现（`shutil.which`，仅对 Metashape 目录下的 Python 生效）
+
+**配置示例**：
+```json
+{
+  "metashape_paths": {
+    "metashape_exe": "C:/soft/Metashape/App/Metashape/metashape.exe",
+    "python_exe": "C:/soft/Metashape/App/Metashape/python/python.exe"
+  }
+}
+```
+
+**环境变量示例**（PowerShell）：
+```powershell
+$env:METASHAPE_EXE = "C:\soft\Metashape\App\Metashape\metashape.exe"
+$env:METASHAPE_PYTHON = "C:\soft\Metashape\App\Metashape\python\python.exe"
+```
 
 ## 5. 校验规则
 

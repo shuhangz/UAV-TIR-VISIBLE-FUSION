@@ -84,6 +84,9 @@ class ConfigManager:
 
         self.user_config = dict(cfg)
 
+        # Metashape 路径配置：优先读 JSON 配置，其次读环境变量，最后为空
+        self.metashape_paths = self._resolve_metashape_paths(cfg)
+
         # dataset_profile（不可变事实）
         self.dataset_profile = DatasetProfile()
 
@@ -99,6 +102,52 @@ class ConfigManager:
         # 常用目录句柄
         self.dirs: Dict[str, str] = {}
         self.setup_workspace()
+
+    @staticmethod
+    def _resolve_metashape_paths(cfg: Dict[str, Any]) -> Dict[str, str]:
+        """解析 Metashape 可执行文件路径。
+
+        优先级：JSON 配置 > 环境变量 > 空字符串（需后续设置）。
+        配置示例（JSON）：
+            {
+                "metashape_paths": {
+                    "metashape_exe": "C:/soft/Metashape/App/Metashape/metashape.exe",
+                    "python_exe": "C:/soft/Metashape/App/Metashape/python/python.exe"
+                }
+            }
+        环境变量：METASHAPE_EXE, METASHAPE_PYTHON
+        """
+        import shutil
+
+        user_paths = cfg.get("metashape_paths", {})
+        if not isinstance(user_paths, dict):
+            user_paths = {}
+
+        metashape_exe = (
+            user_paths.get("metashape_exe", "")
+            or os.environ.get("METASHAPE_EXE", "")
+        )
+        python_exe = (
+            user_paths.get("python_exe", "")
+            or os.environ.get("METASHAPE_PYTHON", "")
+        )
+
+        # 尝试 shutil.which 自动发现（仅当上面都没配时）
+        if not metashape_exe:
+            found = shutil.which("metashape.exe")
+            if found:
+                metashape_exe = found
+        if not python_exe:
+            found = shutil.which("python.exe")
+            if found:
+                # 只接受 Metashape 目录下的 python，避免误用系统 Python
+                if "Metashape" in found or "metashape" in found:
+                    python_exe = found
+
+        return {
+            "metashape_exe": metashape_exe,
+            "python_exe": python_exe,
+        }
 
     @staticmethod
     def _normalize_stage_name(stage_name: str) -> str:
@@ -225,6 +274,7 @@ class ConfigManager:
             'output_paths': {
                 'run_root': self.run_dir
             },
+            'metashape_paths': self.metashape_paths,
             'stage_status': {s: 'pending' for s in self.runtime_config.stage_selection},
             'runtime_config_snapshot': asdict(self.runtime_config)
         }

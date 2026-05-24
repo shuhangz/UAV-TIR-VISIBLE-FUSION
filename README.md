@@ -94,19 +94,37 @@ exiftool -json test_Arctic/rgb_dir/*.JPG test_Arctic/tiff_dir/*.TIFF > metadata_
 
 **注意**：该文件记录了相机的焦距、感光度、曝光时间、传感器温度等关键参数，后续阶段（尤其是热辐射校正）依赖它。
 
+### 配置 Metashape 路径
+
+在项目的 JSON 配置文件中添加 `metashape_paths` 字段，这样就不用每次手动输入完整路径：
+
+```json
+{
+  "metashape_paths": {
+    "metashape_exe": "C:/soft/Metashape/App/Metashape/metashape.exe",
+    "python_exe": "C:/soft/Metashape/App/Metashape/python/python.exe"
+  }
+}
+```
+
+也可以通过环境变量设置（PowerShell）：
+```powershell
+$env:METASHAPE_EXE = "C:\soft\Metashape\App\Metashape\metashape.exe"
+$env:METASHAPE_PYTHON = "C:\soft\Metashape\App\Metashape\python\python.exe"
+```
+
+详细说明见 [docs/runtime_config.md](docs/runtime_config.md) 的 4.3 节。
+
 ### 执行全链路
 
 > **注意**：不可以使用 `python main.py`，必须通过 Metashape 引擎来调用！
 
 ```powershell
-# 默认使用 workspace_root 的数据进行完整处理
-& "path/to/metashape/App/Metashape/metashape.exe" -r "path/to/main.py"
+# 假设 Metashape 安装在 C:\soft\Metashape，使用配置文件运行：
+& "C:\soft\Metashape\App\Metashape\metashape.exe" -r "path\to\main.py"
 
-# （可选）通过参数指定（注：在作为脚本传递给 Metashape 时，若需附加脚本参数，可在脚本后空一格再加上，如）：
-& "path/to/metashape/App/Metashape/metashape.exe" -r "path/to/main.py" run_all
-
-# 指定自定义配置文件（JSON 格式）
-& "path/to/metashape/App/Metashape/metashape.exe" -r "path/to/main.py" --config-file path/to/custom_config.json
+# 指定自定义配置文件（JSON 格式，可包含 metashape_paths）
+& "C:\soft\Metashape\App\Metashape\metashape.exe" -r "path\to\main.py" --config-file custom_config.json
 ```
 
 ---
